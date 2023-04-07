@@ -8,13 +8,13 @@ from tqdm import tqdm
 
 if __name__=="__main__":
     #load dataset
-    data_file="./_dataset/sst2/test.jsonl"
+    data_file="./dataset/sst2/test.jsonl"
     with open(data_file,'r') as f:
         all_data=f.readlines()
 
     #load model
 
-    paddle.set_device('gpu:7')
+    paddle.set_device('gpu:0')
     tokenizer=AutoTokenizer.from_pretrained("bert-base-uncased")
     model=AutoModel.from_pretrained("bert-base-uncased")
     model.eval()
@@ -37,11 +37,11 @@ if __name__=="__main__":
         
         output=model(input_ids=input_ids, attention_mask=attention_mask,return_dict=True)
         
-        p=output.last_hidden_state[:,0]
+        p=output.last_hidden_state[:,0].cpu()
         ps.append(p)
 
-    final_p=paddle.cat(ps,dim=0)
+    final_p=paddle.concat(ps,axis=0)
 
     assert final_p.shape[0]==len(all_data)
 
-    paddle.save(final_p,'./_dataset/sst2/t.pt')
+    paddle.save(final_p,'./dataset/sst2/t.pd')
