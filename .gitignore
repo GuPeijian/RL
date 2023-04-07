@@ -4,3 +4,5 @@ paddlehubfile
 .vscode
 logs
 gitpush.sh
+__pycache__
+test.py
