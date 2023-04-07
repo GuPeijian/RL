@@ -7,4 +7,4 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.95
 export GLOG_v=1
 export CUDA_VISIBLE_DEVICES=0
 
-python ./test.py
+python ./save_embedding.py
