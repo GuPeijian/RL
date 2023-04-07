@@ -129,7 +129,7 @@ def main():
         set_seed(args.seed)
 
     #set device
-    paddle.device.set_device("gpu:4")
+    paddle.device.set_device("gpu:0")
 
     #load llm
     tokenizer = AutoTokenizer.from_pretrained(args.llm_dir)
