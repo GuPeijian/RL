@@ -43,7 +43,8 @@ if __name__=="__main__":
     model=AutoModel.from_pretrained("bert-base-uncased")
     model.eval()
 
-    dataset_list=os.listdir("./dataset")
+    #dataset_list=os.listdir("./dataset")
+    dataset_list=["sst2","subj"]
     
     for dataset in dataset_list:
         print(f"start generate {dataset}")
