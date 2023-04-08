@@ -4,6 +4,7 @@ source model_conf
 export FLAGS_fraction_of_gpu_memory_to_use=0.95
 export CUDA_VISIBLE_DEVICES=0
 
+for SEED in "${SEED_SET[@]}"; do
 python ./rl.py \
     --data_path ${DATA_PATH} \
     --dataset_name ${DATASET} \
@@ -18,3 +19,4 @@ python ./rl.py \
     --warmup_ratio 0 \
     --weight_decay 0 \
     --output_dir ./output_rl
+done
