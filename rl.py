@@ -3,7 +3,6 @@ import random
 from time import sleep
 import logging
 import argparse
-from tqdm import tqdm,trange
 import csv
 import os
 import time,math
@@ -205,7 +204,7 @@ def main():
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(f"  Total optimization steps = {max_train_steps}")
 
-    log_path=os.path.join(args.output_dir,"log/"+args.dataset_name)
+    log_path=os.path.join(args.output_dir,"log/"+args.dataset_name+f"/{args.seed}")
     if not os.path.exists(log_path):
         os.makedirs(log_path, exist_ok=True)
     writer = LogWriter(log_path)
@@ -214,8 +213,8 @@ def main():
     total_p=0.0
     last_p=0.0
 
-    for epoch in trange(args.num_train_epochs):
-        for step,batch in tqdm(enumerate(train_dataloader),total=len(train_dataloader)):
+    for epoch in range(args.num_train_epochs):
+        for step,batch in enumerate(train_dataloader):
             #sample sample_num trace for each sample
             input_ids=paddle.repeat_interleave(batch.unsqueeze(1),repeats=args.sample_num,axis=0)
             sampled_ids,sampled_probs=sample(rl_model,input_ids,8)
@@ -251,15 +250,12 @@ def main():
                 time_log = time.time()
                 last_p=total_p
 
-    save_dir = os.path.join(args.output_dir, args.dataset_name)
+    save_dir = os.path.join(args.output_dir, args.dataset_name+f"/{args.seed}") 
     if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     
     #save p
-    model_to_save = (
-        rl_model.module if hasattr(rl_model, "module") else rl_model
-    )
-    model_to_save.save_pretrained(save_dir)
+    rl_model.save_pretrained(save_dir)
 
 
 if __name__=="__main__":

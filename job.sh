@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 echo "==============JOB BEGIN============"
 
 bash ./setup.sh
