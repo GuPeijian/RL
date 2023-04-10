@@ -11,7 +11,7 @@ python ./rl.py \
     --llm_dir ${LLM_DIR} \
     --seed ${SEED} \
     --max_length 1024 \
-    --num_train_epochs 10 \
+    --num_train_epochs 5 \
     --learning_rate 1e-4 \
     --train_batch_size 32 \
     --eval_batch_size 32 \
