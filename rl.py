@@ -178,6 +178,7 @@ def main():
     lr_scheduler = OneCycleLR(
         max_learning_rate=args.learning_rate,
         phase_pct=args.warmup_ratio,
+        end_learning_rate=0.0,
         total_steps=max_train_steps,
         anneal_strategy="linear",
     )
