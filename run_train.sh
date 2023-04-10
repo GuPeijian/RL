@@ -19,4 +19,5 @@ python ./rl.py \
     --warmup_ratio 0 \
     --weight_decay 0 \
     --output_dir ./output_rl
+
 done

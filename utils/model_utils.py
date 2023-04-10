@@ -40,6 +40,7 @@ def generate(model,
     
 def sample(model,
            input_ids=None,
+           topk_ids=None,
            len=None,
            temperature=1.0):
     """
@@ -47,6 +48,7 @@ def sample(model,
     input:
         model: AR model
         input_ids: input example index,used in training
+        topk_ids: bm25 topk id for each example
         len: generate length
         temperature: sample temperature
     output:
@@ -61,11 +63,17 @@ def sample(model,
     #index 
     index_ids=paddle.to_tensor([[i] for i in range(_input_ids.shape[0])])
 
-    mask=F.one_hot(_input_ids.squeeze(1),num_classes=model.config.vocab_size)
+    #mask=F.one_hot(_input_ids.squeeze(1),num_classes=model.config.vocab_size)
+    mask=paddle.ones((_input_ids.shape[0],model.config.vocab_size),dtype="int32")
+    #only topk is 0 i.e. not masked
+    for b in range(len(topk_ids)):
+        for n in range(len(topk_ids[b])):
+            mask[b][topk_ids[b][n]]=0
+    
     for round in range(len):
         logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
 
-        #ignore input sample
+        #only consider unmasked token
         logits[mask==1]-=M
 
         #sample

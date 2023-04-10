@@ -10,6 +10,7 @@ from tqdm import tqdm
 import copy
 from paddle.io import Dataset
 
+from bm25 import build_bm25_corpus
 
 class BASEDataset(Dataset):
     def __init__(
@@ -30,6 +31,7 @@ class BASEDataset(Dataset):
                 self.data.append(instance)
 
         self.sampled_data=[]
+        self.bm25_corpus=None
 
         # customize your own label map in inheritance
         self.dataset_name=''
@@ -48,6 +50,23 @@ class BASEDataset(Dataset):
         for id in ids:
             sampled_data.append(self.data[id])
         self.sampled_data=sampled_data
+    
+    def build_corpus(self):
+        self.bm25_corpus=build_bm25_corpus(self)
+        
+    def get_bm25_topk(self,input_ids,k=100):
+        if self.bm25_corpus is None:
+            self.build_corpus()
+        output_topk_ids=[]
+        for id in input_ids:
+            query=self.data[id]["sentence"].split(" ")
+            #id itself is the most similar and remove it
+            topk_ids=self.bm25_corpus.get_top_n(query,[i for i in range(len(self))],k+1)
+            assert id in topk_ids
+            topk_ids.remove(id)
+            output_topk_ids.append(topk_ids)
+        return output_topk_ids
+
     
 class SST2Dataset(BASEDataset):
     def __init__(

@@ -6,9 +6,8 @@ bash ./setup.sh
 
 echo "===============SETUP DONE=========="
 
-#bash ./run_train.sh
-#bash ./run_eval.sh
-bash ./run_analysis.sh
+bash ./run_train.sh
 
+sleep 2h
 
 echo "===============JOB END============="
