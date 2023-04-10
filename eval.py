@@ -188,7 +188,7 @@ def main():
         csvwriter = csv.writer(csvfile)
         if not csv_exists:
             csvwriter.writerow(['dataset', 'seed', 'acc'])
-        csvwriter.writerow([args.dataset,
+        csvwriter.writerow([args.dataset_name,
                             args.seed,
                             acc])
 
