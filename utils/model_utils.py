@@ -41,7 +41,7 @@ def generate(model,
 def sample(model,
            input_ids=None,
            topk_ids=None,
-           len=None,
+           length=None,
            temperature=1.0):
     """
     sample RL traces for training
@@ -49,7 +49,7 @@ def sample(model,
         model: AR model
         input_ids: input example index,used in training
         topk_ids: bm25 topk id for each example
-        len: generate length
+        length: generate length
         temperature: sample temperature
     output:
         output_ids: selected ids
@@ -70,7 +70,7 @@ def sample(model,
         for n in range(len(topk_ids[b])):
             mask[b][topk_ids[b][n]]=0
     
-    for round in range(len):
+    for round in range(length):
         logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
 
         #only consider unmasked token
