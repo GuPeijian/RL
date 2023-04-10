@@ -10,7 +10,7 @@ from tqdm import tqdm
 import copy
 from paddle.io import Dataset
 
-from bm25 import build_bm25_corpus
+from .bm25 import build_bm25_corpus
 
 class BASEDataset(Dataset):
     def __init__(
