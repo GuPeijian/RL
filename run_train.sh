@@ -16,7 +16,7 @@ python ./rl.py \
     --train_batch_size 32 \
     --eval_batch_size 32 \
     --sample_num 4\
-    --warmup_ratio 0 \
+    --warmup_ratio 0.06 \
     --weight_decay 0 \
     --output_dir ./output_rl
 
