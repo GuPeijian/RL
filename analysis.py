@@ -130,7 +130,6 @@ def main():
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
-    llm=AutoModelForCausalLM.from_pretrained(args.llm_dir)
 
     #load data embeddings
     data_embeddings=paddle.load(os.path.join(args.data_path,"test.pd"))
@@ -159,7 +158,6 @@ def main():
     eval_dataloader=DataLoader(index_dataset,batch_size=args.eval_batch_size,shuffle=False,collate_fn=combine)
 
     #eval
-    llm.eval()
     rl_model.eval()
     
     # Eval!
@@ -167,30 +165,23 @@ def main():
     logger.info(f"  Num examples = {len(eval_dataset)}")
     logger.info(f"  Instantaneous batch size per device = {args.eval_batch_size}")
 
-    predictions=[]
+    ids=[]
     for step,batch in enumerate(eval_dataloader):
         #sample sample_num trace for each sample
         input_embeddings,input_ids=batch
         #generate
         sampled_ids=generate(rl_model,input_embeddings,8)
         #evaluate
-        with paddle.no_grad():
-            predictions.extend(test_by_LLM(llm,train_dataset,eval_dataset,tokenizer,
-                                           input_ids,sampled_ids,args.eval_batch_size,args.max_length))
-    
-    acc=metric(eval_dataset,predictions)
+        ids.extend(sampled_ids)
 
     
     # logging
-    save_results_file = os.path.join(args.output_dir, 'results_rl.csv')
-    csv_exists = os.path.isfile(save_results_file)
-    with open(save_results_file, 'a+', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        if not csv_exists:
-            csvwriter.writerow(['dataset', 'seed', 'acc'])
-        csvwriter.writerow([args.dataset_name,
-                            args.seed,
-                            acc])
+    save_dir=os.path.join(args.output_dir,"sample_ids/"+args.dataset_name+f"/{args.seed}")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_path=os.path.join(save_dir,'ids.json')
+    with open(save_path,'w') as w:
+        json.dump(ids,w)
 
 if __name__=="__main__":
     main()
