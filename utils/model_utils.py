@@ -112,6 +112,15 @@ def parse_response(gen_logits, tokenizer, id2verb):
     prob_per_cls=paddle.stack(prob_per_cls,axis=1)
     return prob_per_cls
 
+def flatten(input_texts,labels):
+    #flatten [[N]*k] -> [N*k] 
+    output_texts=[]
+    output_labels=[]
+    for i,seq in enumerate(input_texts):
+        output_texts.extend(seq)
+        output_labels.extend(labels[i])
+    return output_texts,input_texts
+
 def eval_by_LLM(model,
                 dataset=None,
                 tokenizer=None,
@@ -132,38 +141,44 @@ def eval_by_LLM(model,
     output:
         rewards: Loss for each model
     """
+    num_query=len(query_ids)
+    n_shot=len(example_ids[i])
     #loss fuction
     loss_fct=paddle.nn.CrossEntropyLoss(reduction="none")
-
+    
     #make prompts
-    input_texts=[]
-    labels=[]
+    input_texts=[[] for _ in range(n_shot)]
+    labels=[[[] for _ in range(n_shot)]]
     for i,query_id in enumerate(query_ids):
         query=make_prompt(dataset,[query_id],"inference")
-        prompts=make_prompt(dataset,example_ids[i],"train")
-        input_text=prompts+query
-        input_texts.append(input_text)
-        #load label
         label=dataset.label2id[dataset[query_id]["label"]]
-        labels.append(label)
-
+        for num_example in range(n_shot):
+            #select num_example example for prompt
+            prompts=make_prompt(dataset,example_ids[i][:num_example+1],"train")
+            input_text=prompts+query
+            input_texts[num_example].append(input_text)
+            #save label
+            labels[num_example].append(label)
+    #flatten input_texts make input with similar length together    
+    input_texts,labels=flatten(input_texts,labels)
+    
     #generate
-    num_querys=len(query_ids)
-    num_iteration=math.ceil(num_querys/batch_size)
+    num_iteration=math.ceil(num_query*n_shot/batch_size)
     loss=[]
     for i in range(num_iteration):
         batch_input_texts=input_texts[i*batch_size:(i+1)*batch_size]
         gen_logits=llm_gen(model,batch_input_texts,tokenizer,max_length)
         label_logits=parse_response(gen_logits,tokenizer,dataset.id2verb)
-        #TODO build reward use loss
+        
         with paddle.no_grad():
             batch_label=labels[i*batch_size:(i+1)*batch_size]
             batch_label=paddle.to_tensor(batch_label)
             batch_loss=loss_fct(label_logits,batch_label)
             loss.append(batch_loss)
-    # [len(query_ids)]
+    # [num_query*n_shot]
     loss=paddle.concat(loss)
-    
+    # [num_query,n_shot]
+    loss=loss.reshape([n_shot,num_query]).transpose()
     return loss
 
 def test_by_LLM(model,
@@ -234,8 +249,6 @@ def make_mask(topk_ids,num_class):
 
     return mask
 
-
-
 def metric(dataset,predctions):
     num_true=0
     for i in range(len(dataset)):
@@ -245,3 +258,35 @@ def metric(dataset,predctions):
     acc=num_true/len(dataset)
 
     return acc
+
+def calcu_advantage(reward,sample_num,gamma=0.9):
+    #first clacu future reward
+    time_step=reward.shape[1]
+    reward_timestep=paddle.chunk(reward,time_step,axis=1)
+    future_reward=0
+    final_reward=[]
+    for i in range(time_step):
+        #reverse calcu
+        current_reward=reward_timestep[time_step-i-1]+ gamma * future_reward
+        final_reward.appen(current_reward)
+        future_reward=current_reward
+    #reverse back
+    final_reward.reverse()
+    final_reward=paddle.concat(final_reward,axis=1)
+    #calcu mean for each sample_num
+    final_reward=final_reward.reshape((-1,sample_num,time_step))
+    reward_mean=paddle.mean(final_reward,axis=1,keepdim=True)
+    #calcu advantage
+    advantage=final_reward-reward_mean
+
+    return advantage
+    
+def get_loss(probs,advantanges):
+    """
+    1/N Sigma_n (Sigma_t (A_tlogp_t))
+    """
+    assert probs.shape==advantanges.shape
+    log_p=paddle.log(probs)
+    loss=paddle.mean(paddle.sum(advantanges*log_p,axis=1))
+
+    return loss,log_p

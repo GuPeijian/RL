@@ -227,22 +227,19 @@ def main():
             with paddle.no_grad():
                 rewards=eval_by_LLM(llm,train_dataset,tokenizer,input_ids.squeeze(1),sampled_ids,args.eval_batch_size,args.max_length)
             #calucu variance reduced rewards
-            rewards=rewards.unsqueeze(1).reshape((-1,args.sample_num))
-            vr_rewards=rewards-paddle.mean(rewards,axis=-1).unsqueeze(1)
+            advantages=calcu_advantage(rewards,args.sample_num)
             #calcu gradient and normalize
-            log_p=paddle.sum(paddle.log(sampled_probs),axis=1).unsqueeze(1)
-            r_log_p=log_p*vr_rewards.reshape((-1,1))
-            normalized_r_log_p=paddle.mean(r_log_p.squeeze(1))*args.sample_num/(args.sample_num-1)
+            loss,log_p=get_loss(sampled_probs,advantages)
             # optimize
-            normalized_r_log_p.backward()
+            loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_gradients()
             completed_steps += 1
             
             #log p
-            p_to_log=float(paddle.mean(paddle.exp(log_p.squeeze(1).detach())).cpu().numpy())
-            writer.add_scalar('log_p', p_to_log, completed_steps)
+            p_to_log=float(paddle.mean(paddle.exp(paddle.mean(log_p.detach(),axis=1))).cpu().numpy())
+            writer.add_scalar('p', p_to_log, completed_steps)
             writer.add_scalar('lr', lr_scheduler.get_lr(), completed_steps)
             total_p+=p_to_log
 
@@ -250,7 +247,7 @@ def main():
                 logger.info(f"steps: {completed_steps}/{max_train_steps},"
                             f" epoch: {epoch}/{args.num_train_epochs},"
                             f" lr: {lr_scheduler.get_lr():.2e},"
-                            f" log_p: {(total_p-last_p)/10},"
+                            f" p: {(total_p-last_p)/10},"
                             f" efficiency: {10 / (time.time() - time_log):.2f}steps/s")
                 time_log = time.time()
                 last_p=total_p
