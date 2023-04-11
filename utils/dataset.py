@@ -17,6 +17,7 @@ class BASEDataset(Dataset):
         self,
         data_dir,
         mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__()
@@ -31,7 +32,15 @@ class BASEDataset(Dataset):
                 self.data.append(instance)
 
         self.sampled_data=[]
-        self.bm25_corpus=None
+        self.k=k
+        if not f"top{k}.json" in os.listdir(data_dir):
+            self.topk=self.build_topk(k)
+            #save
+            with open(os.path.join(data_dir,f"top{k}.json"),'w') as w:
+                json.dump(self.topk,w)
+        else:
+            with open(os.path.join(data_dir,f"top{k}.json"),'r') as f:
+                self.topk=json.load(f)
 
         # customize your own label map in inheritance
         self.dataset_name=''
@@ -51,28 +60,33 @@ class BASEDataset(Dataset):
             sampled_data.append(self.data[id])
         self.sampled_data=sampled_data
     
-    def build_corpus(self):
-        self.bm25_corpus=build_bm25_corpus(self)
-        
-    def get_bm25_topk(self,input_ids,k=100):
-        if self.bm25_corpus is None:
-            self.build_corpus()
-        output_topk_ids=[]
-        for id in input_ids:
+    def build_topk(self,k):
+        bm25_corpus=build_bm25_corpus(self)
+        indices=[i for i in range(len(self))]
+        all_topk_ids=[]
+        for id in indices:
             query=self.data[id]["sentence"].split(" ")
             #id itself is the most similar and remove it
-            topk_ids=self.bm25_corpus.get_top_n(query,[i for i in range(len(self))],k+1)
+            topk_ids=bm25_corpus.get_top_n(query,[i for i in range(len(self))],k+1)
             assert id in topk_ids
             topk_ids.remove(id)
-            output_topk_ids.append(topk_ids)
-        return output_topk_ids
+            all_topk_ids.append(topk_ids)
+        return all_topk_ids
 
+    
+    def get_bm25_topk(self,input_ids,k=100):
+        assert k <= self.k
+        output_ids=[]
+        for id in input_ids:
+            output_ids.append(self.topk[id])
+        return output_ids
     
 class SST2Dataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -86,7 +100,8 @@ class SUBJDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -101,7 +116,8 @@ class AGNEWSDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -115,7 +131,8 @@ class CBDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -129,7 +146,8 @@ class CRDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -143,7 +161,8 @@ class DBPEDIADataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         if mode == 'dev':
@@ -167,7 +186,8 @@ class MPQADataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -181,7 +201,8 @@ class MRDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -195,7 +216,8 @@ class RTEDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -209,7 +231,8 @@ class SST5Dataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
@@ -223,7 +246,8 @@ class TRECDataset(BASEDataset):
     def __init__(
         self,
         data_dir,
-        mode
+        mode,
+        k=100
     ):
         """data key: sentence, label[0/1]"""
         super().__init__(data_dir, mode)
