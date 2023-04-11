@@ -119,7 +119,7 @@ def flatten(input_texts,labels):
     for i,seq in enumerate(input_texts):
         output_texts.extend(seq)
         output_labels.extend(labels[i])
-    return output_texts,input_texts
+    return output_texts,output_labels
 
 def eval_by_LLM(model,
                 dataset=None,
