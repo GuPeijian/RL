@@ -22,6 +22,6 @@ QUEUE_NAME=nlp-40g-9-yq01-k8s-gpu-a100-8
 
 #data
 DATA_PATH=./dataset/subj/
-DATASET=subj-lrd
+DATASET=subj-sr
 LLM_DIR=./lm/gpt2-xl
-SEED_SET=(42 1 2 3 4)
+SEED_SET=(42)
