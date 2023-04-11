@@ -178,7 +178,7 @@ def eval_by_LLM(model,
     # [num_query*n_shot]
     loss=paddle.concat(loss)
     # [num_query,n_shot]
-    loss=loss.reshape([n_shot,num_query]).transpose()
+    loss=loss.reshape([n_shot,num_query]).transpose((1,0))
     return loss
 
 def test_by_LLM(model,
