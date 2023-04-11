@@ -277,7 +277,7 @@ def calcu_advantage(reward,sample_num,gamma=0.9):
     final_reward=final_reward.reshape((-1,sample_num,time_step))
     reward_mean=paddle.mean(final_reward,axis=1,keepdim=True)
     #calcu advantage
-    advantage=final_reward-reward_mean
+    advantage=(final_reward-reward_mean).reshape((-1,time_step))
 
     return advantage
     
