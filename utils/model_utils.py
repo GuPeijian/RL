@@ -142,13 +142,13 @@ def eval_by_LLM(model,
         rewards: Loss for each model
     """
     num_query=len(query_ids)
-    n_shot=len(example_ids[i])
+    n_shot=len(example_ids[0])
     #loss fuction
     loss_fct=paddle.nn.CrossEntropyLoss(reduction="none")
     
     #make prompts
     input_texts=[[] for _ in range(n_shot)]
-    labels=[[[] for _ in range(n_shot)]]
+    labels=[[] for _ in range(n_shot)]
     for i,query_id in enumerate(query_ids):
         query=make_prompt(dataset,[query_id],"inference")
         label=dataset.label2id[dataset[query_id]["label"]]
