@@ -64,11 +64,7 @@ def sample(model,
     index_ids=paddle.to_tensor([[i] for i in range(_input_ids.shape[0])])
 
     #mask=F.one_hot(_input_ids.squeeze(1),num_classes=model.config.vocab_size)
-    mask=paddle.ones((_input_ids.shape[0],model.config.vocab_size),dtype="int32")
-    #only topk is 0 i.e. not masked
-    for b in range(len(topk_ids)):
-        for n in range(len(topk_ids[b])):
-            mask[b][topk_ids[b][n]]=0
+    mask=make_mask(topk_ids,model.config.vocab_size)
     
     for round in range(length):
         logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
@@ -214,6 +210,31 @@ def test_by_LLM(model,
     prediction=paddle.argmax(logits,axis=1).cpu().tolist()
 
     return prediction
+
+def make_mask(topk_ids,num_class):
+    batch_size=len(topk_ids)
+    k=len(topk_ids[0])
+    #initail mask
+    mask=paddle.ones((batch_size,num_class),dtype="int32")
+
+    #build index
+    index_1=paddle.to_tensor(topk_ids,dtype="int32").unsqueeze(2)
+
+    index_0=[]
+    for i in range(batch_size):
+        index_0.append([i for _ in range(k)])
+    index_0=paddle.to_tensor(index_0,dtype="int32").unsqueeze(2)
+    #concat and reshape [batch_size*k, 2]
+    index=paddle.concat((index_0,index_1),axis=2).reshape([-1,2])
+    
+    value=paddle.to_tensor([-1]*(batch_size*k),dtype="int32")
+
+    #build mask
+    mask=paddle.scatter_nd_add(mask,index,value)
+
+    return mask
+
+
 
 def metric(dataset,predctions):
     num_true=0
