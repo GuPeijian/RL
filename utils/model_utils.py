@@ -268,7 +268,7 @@ def calcu_advantage(reward,sample_num,gamma=0.9):
     for i in range(time_step):
         #reverse calcu
         current_reward=reward_timestep[time_step-i-1]+ gamma * future_reward
-        final_reward.appen(current_reward)
+        final_reward.append(current_reward)
         future_reward=current_reward
     #reverse back
     final_reward.reverse()
