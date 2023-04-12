@@ -22,7 +22,7 @@ def generate(model,
     output_ids=[]
     batch_size=input_embeddings.shape[0]
     #prepare mask
-    mask=paddle.ones((batch_size,model.config.vocab_size),dtype="int32")
+    mask=paddle.zeros((batch_size,model.config.vocab_size),dtype="int32")
     #index 
     index_ids=paddle.to_tensor([[i] for i in range(batch_size)])
     M=1e8
