@@ -20,17 +20,26 @@ def generate(model,
 
     inputs_embeds=input_embeddings.unsqueeze(1)
     output_ids=[]
+    batch_size=input_embeddings.shape[0]
+    #prepare mask
+    mask=paddle.ones((batch_size,model.config.vocab_size),dtype="int32")
+    #index 
+    index_ids=paddle.to_tensor([[i] for i in range(batch_size)])
+    M=1e8
 
     for round in range(len):
         logits=model(inputs_embeds=inputs_embeds,return_dict=True).logits[:,-1,:]
 
-        #argmax
-        ids=paddle.argmax(logits,axis=1).unsqueeze(-1)
+        logits[mask==1]-=M
 
+        #argmax sample
+        ids=paddle.argmax(logits,axis=1).unsqueeze(-1)
+        index=paddle.concat((index_ids,ids),axis=1)
+        #update mask, avoid duplicate sample
+        mask=update_mask(mask,index)
         #add to input
         new_embeds=model.get_input_embeddings()(ids)
         inputs_embeds=paddle.concat((inputs_embeds,new_embeds),axis=1)
-
         #save ids
         output_ids.append(ids)
     
@@ -75,8 +84,11 @@ def sample(model,
         #sample
         probs=F.softmax(logits/temperature,axis=-1)
         sampled_ids=paddle.multinomial(probs,num_samples=1)
-        sampled_probs=paddle.gather_nd(probs,index=paddle.concat((index_ids,sampled_ids),axis=1)).unsqueeze(1)
-        
+        #build index
+        index=paddle.concat((index_ids,sampled_ids),axis=1)
+        sampled_probs=paddle.gather_nd(probs,index=index).unsqueeze(1)
+        #update mask, avoid duplicate sample
+        mask=update_mask(mask,index)
         #add to input
         _input_ids=paddle.concat((_input_ids,sampled_ids),axis=1)
 
@@ -234,7 +246,16 @@ def make_mask(topk_ids,num_class):
 
     return mask
 
+def update_mask(mask,index):
+    """
+    mask[sample_ids[i]]+=1 (0->1)
+    """
+    batch_size=mask.shape[0]
+    value=paddle.to_tensor([1]*batch_size,dtype="int32") 
+    #update mask
+    mask=paddle.scatter_nd_add(mask,index,value)
 
+    return mask
 
 def metric(dataset,predctions):
     num_true=0
