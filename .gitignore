@@ -6,3 +6,5 @@ logs
 gitpush.sh
 __pycache__
 test.py
+config.ini
+setup.sh
