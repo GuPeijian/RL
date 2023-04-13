@@ -67,6 +67,8 @@ def sample(model,
     _input_ids=input_ids
     output_ids=[]
     output_probs=[]
+    output_max_ids=[]
+    output_max_probs=[]
     #prepare mask
     M=1e8
     #index 
@@ -84,6 +86,9 @@ def sample(model,
         #sample
         probs=F.softmax(logits/temperature,axis=-1)
         sampled_ids=paddle.multinomial(probs,num_samples=1)
+        #lod max id and prob
+        max_ids=paddle.argmax(probs,axis=1).unsqueeze(-1)
+        max_probs=paddle.max(probs,axis=1).unsqueeze(-1)
         #build index
         index=paddle.concat((index_ids,sampled_ids),axis=1)
         sampled_probs=paddle.gather_nd(probs,index=index).unsqueeze(1)
@@ -95,11 +100,16 @@ def sample(model,
         #save
         output_ids.append(sampled_ids)
         output_probs.append(sampled_probs)
+        output_max_ids.append(max_ids)
+        output_max_probs.append(max_probs)
     
     output_ids=paddle.concat(output_ids,axis=1).cpu().tolist()
     output_probs=paddle.concat(output_probs,axis=1)
+
+    output_max_ids=paddle.concat(output_max_ids,axis=1).cpu().tolist()
+    output_max_probs=paddle.concat(output_max_probs,axis=1).cpu().tolist()
     
-    return output_ids,output_probs
+    return output_ids,output_probs,output_max_ids,output_max_probs
 
 def llm_gen(model, prompt, tokenizer, max_context_len):
     inputs = tokenizer.batch_encode(prompt,truncation=True,padding=True,return_tensors='pd',return_attention_mask=True,return_token_type_ids=False)

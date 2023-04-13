@@ -211,6 +211,8 @@ def main():
     #log file
     id_file=open(os.path.join(log_path,"id.jsonl"),'w')
     prob_file=open(os.path.join(log_path,"prob.jsonl"),'w')
+    max_id_file=open(os.path.join(log_path,"max_id.jsonl"),'w')
+    max_prob_file=open(os.path.join(log_path,"max_prob.jsonl"),'w')
     reward_file=open(os.path.join(log_path,"reward.jsonl"),'w')
 
     writer = LogWriter(os.getenv("VDL_LOG_PATH"))
@@ -227,10 +229,12 @@ def main():
             #get topk example
             topk_ids=train_dataset.get_bm25_topk(input_ids.squeeze(1).cpu().tolist(),k=100)
 
-            sampled_ids,sampled_probs=sample(rl_model,input_ids,topk_ids,8)
+            sampled_ids,sampled_probs,max_ids,max_probs=sample(rl_model,input_ids,topk_ids,8)
             #log ids and probs
             id_file.write(json.dumps(sampled_ids)+"\n")
             prob_file.write(json.dumps(sampled_probs.cpu().tolist())+"\n")
+            max_id_file.write(json.dumps(max_ids)+"\n")
+            max_prob_file.write(json.dumps(max_probs)+"\n")
             #evaluate
             with paddle.no_grad():
                 rewards=eval_by_LLM(llm,train_dataset,tokenizer,input_ids.squeeze(1),sampled_ids,args.eval_batch_size,args.max_length)
@@ -268,6 +272,8 @@ def main():
     id_file.close()
     prob_file.close()
     reward_file.close()
+    max_id_file.close()
+    max_prob_file.close()
 
     save_dir = os.path.join(args.output_dir, args.dataset_name+f"/{args.seed}") 
     if not os.path.exists(save_dir):
