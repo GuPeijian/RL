@@ -208,7 +208,12 @@ def main():
     log_path=os.path.join(args.output_dir,"log/"+args.dataset_name+f"/{args.seed}")
     if not os.path.exists(log_path):
         os.makedirs(log_path, exist_ok=True)
-    writer = LogWriter(log_path)
+    #log file
+    id_file=open(os.path.join(log_path,"id.jsonl"),'w')
+    prob_file=open(os.path.join(log_path,"prob.jsonl"),'w')
+    reward_file=open(os.path.join(log_path,"reward.jsonl"),'w')
+
+    writer = LogWriter(os.getenv("VDL_LOG_PATH"))
     completed_steps = 0
     time_log = time.time()
     total_p=0.0
@@ -223,12 +228,18 @@ def main():
             topk_ids=train_dataset.get_bm25_topk(input_ids.squeeze(1).cpu().tolist(),k=100)
 
             sampled_ids,sampled_probs=sample(rl_model,input_ids,topk_ids,8)
+            #log ids and probs
+            id_file.write(json.dumps(sampled_ids)+"\n")
+            prob_file.write(json.dumps(sampled_probs.cpu().tolist())+"\n")
             #evaluate
             with paddle.no_grad():
                 rewards=eval_by_LLM(llm,train_dataset,tokenizer,input_ids.squeeze(1),sampled_ids,args.eval_batch_size,args.max_length)
+
             #calucu variance reduced rewards
             rewards=rewards.unsqueeze(1).reshape((-1,args.sample_num))
             vr_rewards=rewards-paddle.mean(rewards,axis=-1).unsqueeze(1)
+            #log reward
+            reward_file.write(json.dumps(vr_rewards.cpu().tolist())+"\n")
             #calcu gradient and normalize
             log_p=paddle.sum(paddle.log(sampled_probs),axis=1).unsqueeze(1)
             r_log_p=log_p*vr_rewards.reshape((-1,1))
@@ -241,8 +252,8 @@ def main():
             completed_steps += 1
             
             #log p
-            p_to_log=float(paddle.mean(paddle.exp(log_p.squeeze(1).detach())).cpu().numpy())
-            writer.add_scalar('log_p', p_to_log, completed_steps)
+            p_to_log=float(paddle.mean(paddle.exp(paddle.mean(log_p.detach(),axis=1))).cpu().numpy())
+            writer.add_scalar('p', p_to_log, completed_steps)
             writer.add_scalar('lr', lr_scheduler.get_lr(), completed_steps)
             total_p+=p_to_log
 
@@ -254,11 +265,14 @@ def main():
                             f" efficiency: {10 / (time.time() - time_log):.2f}steps/s")
                 time_log = time.time()
                 last_p=total_p
+    id_file.close()
+    prob_file.close()
+    reward_file.close()
 
     save_dir = os.path.join(args.output_dir, args.dataset_name+f"/{args.seed}") 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
+
     #save p
     rl_model.save_pretrained(save_dir)
 
@@ -314,7 +328,6 @@ def main():
     with open(save_id_path,'w') as w:
         json.dump(ids,w)
 
-
     # logging results
     save_results_file = os.path.join(args.output_dir, 'results_rl.csv')
     csv_exists = os.path.isfile(save_results_file)
@@ -325,7 +338,6 @@ def main():
         csvwriter.writerow([args.dataset_name,
                             args.seed,
                             acc])
-
 
 if __name__=="__main__":
     main()
