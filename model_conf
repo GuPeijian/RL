@@ -18,10 +18,10 @@ use_mixup=True # [True, False]
 JOB_NAME=${JOB_PRE}_test
 
 #a100
-QUEUE_NAME=nlp-40g-9-yq01-k8s-gpu-a100-8
-
+#QUEUE_NAME=nlp-40g-9-yq01-k8s-gpu-a100-8
+QUEUE_NAME=nlp-40g-9-yq01-k8s-gpu-a100-8-a
 #data
 DATA_PATH=./dataset/subj/
-DATASET=subj-mask
+DATASET=subj-mask-t
 LLM_DIR=./lm/gpt2-xl
 SEED_SET=(42)

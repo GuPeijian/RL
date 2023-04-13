@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument(
         "--num_train_epochs",
         type=int,
-        default=10,
+        default=2,
     )
     parser.add_argument(
         "--learning_rate",
@@ -68,7 +68,7 @@ def parse_args():
     parser.add_argument(
         "--train_batch_size",
         type=int,
-        default=32,
+        default=16,
     )
     parser.add_argument(
         "--eval_batch_size",
@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument(
         "--sample_num",
         type=int,
-        default=4,
+        default=8,
     )
     parser.add_argument(
         "--lr_scheduler_type",
@@ -90,12 +90,17 @@ def parse_args():
     parser.add_argument(
         "--warmup_ratio",
         type=float,
-        default=0.0,
+        default=0.06,
     )
     parser.add_argument(
         "--weight_decay",
         type=float,
         default=0.0,
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
     )
     parser.add_argument(
         "--seed",
@@ -229,7 +234,7 @@ def main():
             #get topk example
             topk_ids=train_dataset.get_bm25_topk(input_ids.squeeze(1).cpu().tolist(),k=100)
 
-            sampled_ids,sampled_probs,max_ids,max_probs=sample(rl_model,input_ids,topk_ids,8)
+            sampled_ids,sampled_probs,max_ids,max_probs=sample(rl_model,input_ids,topk_ids,8,temperature=args.temperature)
             #log ids and probs
             id_file.write(json.dumps(sampled_ids)+"\n")
             prob_file.write(json.dumps(sampled_probs.cpu().tolist())+"\n")

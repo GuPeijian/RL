@@ -15,7 +15,8 @@ python ./rl.py \
     --learning_rate 1e-4 \
     --train_batch_size 16 \
     --eval_batch_size 32 \
-    --sample_num 8\
+    --sample_num 8 \
+    --temperature 0.8\
     --warmup_ratio 0.06 \
     --weight_decay 0 \
     --output_dir ./output_rl
