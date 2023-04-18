@@ -194,13 +194,13 @@ def main():
     save_id_dir=os.path.join(args.output_dir,"sample_ids/"+args.dataset_name+f"/{args.seed}")
     if not os.path.exists(save_id_dir):
         os.makedirs(save_id_dir)
-    save_id_path=os.path.join(save_id_dir,'ids.json')
+    save_id_path=os.path.join(save_id_dir,'ids2.json')
     with open(save_id_path,'w') as w:
         json.dump(ids,w)
 
     
     # logging
-    save_results_file = os.path.join(args.output_dir, 'results_rl.csv')
+    save_results_file = os.path.join(args.output_dir, 'results_rl2.csv')
     csv_exists = os.path.isfile(save_results_file)
     with open(save_results_file, 'a+', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
