@@ -303,6 +303,9 @@ def main():
         return (paddle.stack(embedding_list),paddle.concat(index_list))
 
     eval_dataloader=DataLoader(index_dataset,batch_size=args.eval_batch_size,shuffle=False,collate_fn=eval_combine)
+    
+    #build topk
+    train_dataset.build_test_topk(eval_dataset,100)
 
     rl_model.eval()
 
@@ -317,8 +320,9 @@ def main():
         #sample sample_num trace for each sample
         input_embeddings,input_ids=batch
         #generate
+        topk_ids=train_dataset.get_bm25_topk(input_ids.cpu().tolist(),k=100)
         with paddle.no_grad():
-            sampled_ids=generate(rl_model,input_embeddings,8)
+            sampled_ids=generate(rl_model,input_embeddings,topk_ids,8)
         ids.extend(sampled_ids)
         #evaluate
         with paddle.no_grad():

@@ -5,12 +5,14 @@ from .template import make_prompt
 
 def generate(model,
              input_embeddings=None,
-             len=None):
+             topk_ids=None,
+             length=None):
     """
     generate final example ids for test example
     input:
         model: AR model
         input_embeddings: input example embedding, used in test
+        topk_ids: bm25 topk id for each example
         len: generate length
     output:
         output_ids: selected ids for test
@@ -22,12 +24,12 @@ def generate(model,
     output_ids=[]
     batch_size=input_embeddings.shape[0]
     #prepare mask
-    mask=paddle.zeros((batch_size,model.config.vocab_size),dtype="int32")
+    mask=make_mask(topk_ids,model.config.vocab_size)
     #index 
     index_ids=paddle.to_tensor([[i] for i in range(batch_size)])
     M=1e8
 
-    for round in range(len):
+    for round in range(length):
         logits=model(inputs_embeds=inputs_embeds,return_dict=True).logits[:,-1,:]
 
         logits[mask==1]-=M

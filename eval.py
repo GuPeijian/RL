@@ -157,28 +157,41 @@ def main():
         return (paddle.stack(embedding_list),paddle.concat(index_list))
 
     eval_dataloader=DataLoader(index_dataset,batch_size=args.eval_batch_size,shuffle=False,collate_fn=combine)
+    
+    #build topk
+    train_dataset.build_test_topk(eval_dataset,100)
 
     #eval
     llm.eval()
     rl_model.eval()
-    
+
     # Eval!
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(eval_dataset)}")
     logger.info(f"  Instantaneous batch size per device = {args.eval_batch_size}")
 
     predictions=[]
+    ids=[]
     for step,batch in enumerate(eval_dataloader):
         #sample sample_num trace for each sample
         input_embeddings,input_ids=batch
         #generate
-        sampled_ids=generate(rl_model,input_embeddings,8)
+        topk_ids=train_dataset.get_bm25_topk(input_ids.cpu().tolist(),k=100)
+        sampled_ids=generate(rl_model,input_embeddings,topk_ids,8)
+        ids.extend(sampled_ids)
         #evaluate
         with paddle.no_grad():
             predictions.extend(test_by_LLM(llm,train_dataset,eval_dataset,tokenizer,
                                            input_ids,sampled_ids,args.eval_batch_size,args.max_length))
     
     acc=metric(eval_dataset,predictions)
+    #logging ids
+    save_id_dir=os.path.join(args.output_dir,"sample_ids/"+args.dataset_name+f"/{args.seed}")
+    if not os.path.exists(save_id_dir):
+        os.makedirs(save_id_dir)
+    save_id_path=os.path.join(save_id_dir,'ids.json')
+    with open(save_id_path,'w') as w:
+        json.dump(ids,w)
 
     
     # logging

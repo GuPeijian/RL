@@ -23,6 +23,7 @@ class BASEDataset(Dataset):
         super().__init__()
         # if mode == 'dev':
         #     mode = 'dev_subsample'
+        self.data_dir=data_dir
         data_file = os.path.join(data_dir, mode + '.jsonl')
         self.data = []
         with open(data_file, 'r') as f:
@@ -33,14 +34,15 @@ class BASEDataset(Dataset):
 
         self.sampled_data=[]
         self.k=k
-        if not f"top{k}.json" in os.listdir(data_dir):
-            self.topk=self.build_topk(k)
-            #save
-            with open(os.path.join(data_dir,f"top{k}.json"),'w') as w:
-                json.dump(self.topk,w)
-        else:
-            with open(os.path.join(data_dir,f"top{k}.json"),'r') as f:
-                self.topk=json.load(f)
+        if mode=="train":
+            if not f"top{k}.json" in os.listdir(data_dir):
+                self.topk=self.build_topk(k)
+                #save
+                with open(os.path.join(data_dir,f"top{k}.json"),'w') as w:
+                    json.dump(self.topk,w)
+            else:
+                with open(os.path.join(data_dir,f"top{k}.json"),'r') as f:
+                    self.topk=json.load(f)
 
         # customize your own label map in inheritance
         self.dataset_name=''
@@ -72,13 +74,38 @@ class BASEDataset(Dataset):
             topk_ids.remove(id)
             all_topk_ids.append(topk_ids)
         return all_topk_ids
+    
+    def build_test_topk(self,test_dataset,k):
+        if not f"test_top{k}.json" in os.listdir(self.data_dir):
+            bm25_corpus=build_bm25_corpus(self)
+            indices=[i for i in range(len(test_dataset))]
+            all_topk_ids=[]
+            for id in indices:
+                query=test_dataset.data[id]["sentence"].split(" ")
+                topk_ids=bm25_corpus.get_top_n(query,[i for i in range(len(self))],k)
+                all_topk_ids.append(topk_ids)
+            self.test_topk=all_topk_ids
+            #save
+            with open(os.path.join(self.data_dir,f"test_top{k}.json"),'w') as w:
+                json.dump(self.test_topk,w)
+        else:
+            #load
+            with open(os.path.join(self.data_dir,f"test_top{k}.json"),'r') as f:
+                self.test_topk=json.load(f)
+        
 
+    def get_test_topk(self,input_ids,k=100):
+        assert k <= self.k
+        output_ids=[]
+        for id in input_ids:
+            output_ids.append(self.test_topk[id][:k])
+        return output_ids
     
     def get_bm25_topk(self,input_ids,k=100):
         assert k <= self.k
         output_ids=[]
         for id in input_ids:
-            output_ids.append(self.topk[id])
+            output_ids.append(self.topk[id][:k])
         return output_ids
     
 class SST2Dataset(BASEDataset):
