@@ -92,6 +92,11 @@ def parse_args():
         default=0.0,
     )
     parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
