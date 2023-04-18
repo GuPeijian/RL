@@ -8,3 +8,4 @@ __pycache__
 test.py
 config.ini
 setup.sh
+model_conf
