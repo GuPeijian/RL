@@ -25,5 +25,3 @@ paddlecloud job \
     --wall-time ${walltime:-"00:00:00"} \
     --start-cmd "bash ./job.sh" 
     # --is-auto-over-sell ${not_wait} \
-    
-    # --image-addr ${image_addr} \

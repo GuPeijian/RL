@@ -11,12 +11,12 @@ python ./rl.py \
     --llm_dir ${LLM_DIR} \
     --seed ${SEED} \
     --max_length 1024 \
-    --num_train_epochs 2 \
-    --learning_rate 1e-4 \
-    --train_batch_size 16 \
-    --eval_batch_size 32 \
+    --num_train_epochs ${num_train_epochs} \
+    --learning_rate ${lr} \
+    --train_batch_size ${train_batch_size} \
+    --eval_batch_size ${eval_batch_size} \
     --sample_num 8 \
-    --temperature 0.8\
+    --temperature ${temperature}\
     --warmup_ratio 0.06 \
     --weight_decay 0 \
     --output_dir ./output_rl
