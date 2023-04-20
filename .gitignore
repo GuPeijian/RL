@@ -9,3 +9,5 @@ test.py
 config.ini
 setup.sh
 model_conf
+submit_k8s.sh
+job.sh
