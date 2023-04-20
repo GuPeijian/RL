@@ -145,6 +145,71 @@ def flatten(input_texts,labels):
         output_labels.extend(labels[i])
     return output_texts,output_labels
 
+def rank_by_LLM(model,
+                dataset=None,
+                tokenizer=None,
+                query_ids=None,
+                example_ids=None,
+                batch_size=None,
+                max_length=None):
+    """
+    eval the selected_ids
+    input:
+        model: LLM for ICL
+        tokenizer: tokenize of LLM
+        dataset: current dataset
+        query_ids: current ids
+        example_ids: selected ids
+        batch_size: eval batch_size
+        max_length: max_length for context
+    output:
+        top8_ids: top8_ids for each query
+    """
+    num_query=len(query_ids)
+    n_shot=len(example_ids[0])
+    #loss fuction
+    
+    #make prompts
+    input_texts=[]
+    labels=[]
+    for query_id in query_ids:
+        query=make_prompt(dataset,[query_id],"inference")
+        label=dataset.label2id[dataset[query_id]["label"]]
+        for i in range(n_shot):
+            prompts=make_prompt(dataset,[example_ids[i]],"train")
+            input_text=prompts+query
+            input_texts.append(input_text)
+            #save label
+            labels.append(label)
+    
+    #generate
+    num_iteration=math.ceil(num_query*n_shot/batch_size)
+    all_logits=[]
+    for i in range(num_iteration):
+        batch_input_texts=input_texts[i*batch_size:(i+1)*batch_size]
+        gen_logits=llm_gen(model,batch_input_texts,tokenizer,max_length)
+        #[batch_size,num_class]
+        label_logits=parse_response(gen_logits,tokenizer,dataset.id2verb)
+        with paddle.no_grad():
+            batch_label=labels[i*batch_size:(i+1)*batch_size]
+            #[batch_size]
+            batch_label=paddle.to_tensor(batch_label).unsqueeze(1)
+            #gather_nd
+            index=paddle.concat((paddle.to_tensor([n for n in range(batch_label.shape[0])]).unsqueeze(1),batch_label),axis=1)
+            logits=paddle.gather_nd(label_logits,index)
+            all_logits.append(logits)
+
+    # [num_query*n_shot]
+    all_logits=paddle.concat(all_logits)
+    # [num_query,n_shot]
+    all_logits=all_logits.reshape([num_query,n_shot])
+
+    #rank top8 for each query
+    logits_rank=paddle.argsort(all_logits,axis=1,descending=True)
+    top8_ids=logits_rank[:,:8].cpu().tolist()
+
+    return top8_ids
+
 def eval_by_LLM(model,
                 dataset=None,
                 tokenizer=None,
