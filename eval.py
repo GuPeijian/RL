@@ -181,7 +181,7 @@ def main():
         #sample sample_num trace for each sample
         input_embeddings,input_ids=batch
         #generate
-        topk_ids=train_dataset.get_bm25_topk(input_ids.cpu().tolist(),k=100)
+        topk_ids=train_dataset.get_test_topk(input_ids.cpu().tolist(),k=100)
         sampled_ids=generate(rl_model,input_embeddings,topk_ids,8)
         ids.extend(sampled_ids)
         #evaluate
