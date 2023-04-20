@@ -172,11 +172,19 @@ def main():
             top8_ids=rank_by_LLM(llm,train_dataset,tokenizer,
                                 input_ids,topk_ids,args.eval_batch_size,args.max_length)
         ids.extend(top8_ids)
-    
+    #ids is the index in topk need to convert to true index
+    true_ids=[]
+    for i in len(ids):
+        true_id=[]
+        for id in ids[i]:
+            true_id.append(train_dataset.topk[i][id])
+        true_ids.append(true_id)
+        
+
     #logging ids
     save_id_path=os.path.join(args.data_path,"top8.json")
     with open(save_id_path,'w') as w:
-        json.dump(ids,w)
+        json.dump(true_ids,w)
 
 if __name__=="__main__":
     main()
