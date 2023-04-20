@@ -172,11 +172,11 @@ def rank_by_LLM(model,
     #make prompts
     input_texts=[]
     labels=[]
-    for query_id in query_ids:
+    for i,query_id in enumerate(query_ids):
         query=make_prompt(dataset,[query_id],"inference")
         label=dataset.label2id[dataset[query_id]["label"]]
-        for i in range(n_shot):
-            prompts=make_prompt(dataset,[example_ids[i]],"train")
+        for j in range(n_shot):
+            prompts=make_prompt(dataset,[example_ids[i][j]],"train")
             input_text=prompts+query
             input_texts.append(input_text)
             #save label
