@@ -174,7 +174,7 @@ def main():
         ids.extend(top8_ids)
     #ids is the index in topk need to convert to true index
     true_ids=[]
-    for i in len(ids):
+    for i in range(len(ids)):
         true_id=[]
         for id in ids[i]:
             true_id.append(train_dataset.topk[i][id])
