@@ -1,5 +1,10 @@
+import os
+import json
+import numpy as np
 import paddle
 import paddle.nn.functional as F
+from paddle.optimizer import AdamW
+from paddle.nn import CrossEntropyLoss
 import math
 from .template import make_prompt
 
@@ -390,3 +395,62 @@ def get_loss(probs,advantanges):
     loss=paddle.mean(paddle.sum(advantanges*log_p,axis=1))
 
     return loss,log_p
+
+def finetune(model,data_path,lr=1e-4,batch_size=16):
+    #load data
+    with open(os.path.join(data_path,"top8.json"), 'r') as f:
+        top8=json.load(f)
+    
+    num_train_data=len(top8)
+
+    class indexDataset(paddle.io.Dataset):
+        def __init__(self):
+            super().__init__()
+            self.index=np.array([[i] for i in range(num_train_data)])
+            self.data=np.array(top8)
+        def __len__(self):
+            return(num_train_data)
+        def __getitem__(self,idx):
+            return (self.index[idx],self.data[idx])
+    
+    dataset=indexDataset()
+
+    def combine(batch_list):
+        index=[t[0] for t in batch_list]
+        index=np.stack(index,axis=0)
+        data=[t[1] for t in batch_list]
+        data=np.stack(data,axis=0)
+        return (index,data) 
+
+    dataloader=paddle.io.DataLoader(dataset=dataset,batch_size=batch_size,shuffle=True,collate_fn=combine)
+
+    #optimizer
+    no_update = ["word_embeddings"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_update)],
+            "weight_decay": 0.0,
+        },
+        {
+            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_update)],
+            "weight_decay": 0.0,
+        },
+    ]
+    optimizer = AdamW(learning_rate=lr,parameters=optimizer_grouped_parameters)
+
+    loss_fct=CrossEntropyLoss()
+
+    print("****start fintuning****")
+
+    for batch in dataloader:
+        index,data=batch
+        input_ids=paddle.concat((index,data[:,:-1]),axis=-1)
+        label=data
+        logits=model(input_ids=input_ids,return_dict=True).logits
+        assert num_train_data==logits.shape[-1]
+        loss=loss_fct(logits.reshape((-1,num_train_data)),label.reshape((-1,1)).squeeze(-1))
+        loss.backward()
+        optimizer.step()
+        optimizer.clear_gradients()
+
+    print("***finish fintuning***")
