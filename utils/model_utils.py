@@ -118,6 +118,122 @@ def sample(model,
     
     return output_ids,output_probs,output_max_ids,output_max_probs
 
+def sample_sql(model,
+           input_ids=None,
+           topk_ids=None,
+           length=None,
+           temperature=1.0):
+    """
+    sample RL traces for training
+    input:
+        model: AR model
+        input_ids: input example index,used in training
+        topk_ids: bm25 topk id for each example
+        length: generate length
+        temperature: sample temperature
+    output:
+        output_logits: topk logits
+        output_ids: selected ids
+        output_probs: each trace's probability
+    """
+    _input_ids=input_ids
+    output_ids=[]
+    output_probs=[]
+    output_logits=[]
+    #prepare mask
+    M=1e8
+    #index 
+    index_ids=paddle.to_tensor([[i] for i in range(_input_ids.shape[0])])
+
+    topk_ids=paddle.to_tensor(topk_ids)
+    topk_ids=paddle.sort(topk_ids,axis=-1)
+    top_index=paddle.to_tensor([ i//topk_ids.shape[1] for i in range(topk_ids.shape[0] * topk_ids.shape[1])]).unsqueeze(1)
+    top_index=paddle.concat((top_index,topk_ids.reshape((-1,1))),axis=1)
+
+    mask=paddle.zeros_like(topk_ids)
+    
+    for round in range(length):
+        logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
+        #filter topk logits        
+        top_logits=paddle.gather_nd(logits,top_index).reshape(topk_ids.shape)
+        #clone and detach for sample
+        top_logits_=top_logits.clone().detach()
+        #only consider unmasked token   
+        top_logits_[mask==1]-=M
+
+        #sample
+        probs=F.softmax(top_logits_/temperature,axis=-1)
+        sampled_ids=paddle.multinomial(probs,num_samples=1)
+
+        #build index
+        index=paddle.concat((index_ids,sampled_ids),axis=1)
+        sampled_probs=paddle.gather_nd(probs,index=index).unsqueeze(1)
+        #update mask, avoid duplicate sample
+        mask=update_mask(mask,index)
+        #get real_ids
+        real_ids=paddle.gather_nd(topk_ids,index=index).unsqueeze(1)
+        #add to input
+        _input_ids=paddle.concat((_input_ids,real_ids),axis=1)
+
+        #save
+        output_logits.append(top_logits.unsqueeze(1)) # N * 1 * k
+        output_ids.append(sampled_ids)
+        output_probs.append(sampled_probs)
+    
+    output_logits=paddle.concat(output_logits,axis=1) # N * shot * k
+    output_ids=paddle.concat(output_ids,axis=1) # N * shot
+    output_probs=paddle.concat(output_probs,axis=1) # N * shot
+    
+    return output_logits,output_ids,output_ids.cpu().tolist(),output_probs.cpu().tolist()
+
+def get_logits(model,
+               input_ids,
+               topk_ids,
+               actions):
+    """
+    get sample_ids' logits
+    input:
+        model: AR model
+        input_ids: input example index,used in training
+        topk_ids: bm25 topk id for each example
+    output:
+        sample_logits: topk logits
+    """
+    #still need iteration
+    _input_ids=input_ids
+    output_logits=[]
+    #index 
+    index_ids=paddle.to_tensor([[i] for i in range(_input_ids.shape[0])])
+
+    topk_ids=paddle.to_tensor(topk_ids)
+    topk_ids=paddle.sort(topk_ids,axis=-1)
+    top_index=paddle.to_tensor([ i//topk_ids.shape[1] for i in range(topk_ids.shape[0] * topk_ids.shape[1])]).unsqueeze(1)
+    top_index=paddle.concat((top_index,topk_ids.reshape((-1,1))),axis=1)
+    
+    length=actions.shape[1]
+
+    for round in range(length):
+        logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
+        #filter topk logits        
+        top_logits=paddle.gather_nd(logits,top_index).reshape(topk_ids.shape)
+
+        sampled_ids=actions[:,round].unsqueeze(1)
+        #build index
+        index=paddle.concat((index_ids,sampled_ids),axis=1)
+        #get real_ids
+        real_ids=paddle.gather_nd(topk_ids,index=index).unsqueeze(1)
+        #add to input
+        _input_ids=paddle.concat((_input_ids,real_ids),axis=1)
+
+        #save
+        output_logits.append(top_logits.unsqueeze(1)) # N * 1 * k
+
+    output_logits=paddle.concat(output_logits,axis=1) # N * shot * k
+    
+    return output_logits
+
+
+
 def llm_gen(model, prompt, tokenizer, max_context_len):
     inputs = tokenizer.batch_encode(prompt,truncation=True,padding=True,return_tensors='pd',return_attention_mask=True,return_token_type_ids=False)
     if inputs['input_ids'].shape[1] > max_context_len:
@@ -215,7 +331,7 @@ def rank_by_LLM(model,
 
     return top8_ids
 
-def eval_by_LLM(model,
+def eval_by_LLM_dense(model,
                 dataset=None,
                 tokenizer=None,
                 query_ids=None,
@@ -274,6 +390,66 @@ def eval_by_LLM(model,
     # [num_query,n_shot]
     loss=loss.reshape([n_shot,num_query]).transpose((1,0))
     return loss
+
+def eval_by_LLM_sparse(model,
+                dataset=None,
+                tokenizer=None,
+                query_ids=None,
+                example_ids=None,
+                batch_size=None,
+                max_length=None):
+    """
+    eval the selected_ids
+    input:
+        model: LLM for ICL
+        tokenizer: tokenize of LLM
+        dataset: current dataset
+        query_ids: current ids
+        example_ids: selected ids
+        batch_size: eval batch_size
+        max_length: max_length for context
+    output:
+        rewards: Loss for each model
+    """
+    num_query=len(query_ids)
+    
+    #make prompts
+    input_texts=[]
+    labels=[]
+    for i,query_id in enumerate(query_ids):
+        query=make_prompt(dataset,[query_id],"inference")
+        label=dataset.label2id[dataset[query_id]["label"]]
+        prompts=make_prompt(dataset,example_ids[i],"train")
+        input_text=prompts+query
+        input_texts.append(input_text)
+        #save label
+        labels.append(label)
+    
+    #generate
+    num_iteration=math.ceil(num_query/batch_size)
+    all_probs=[]
+    for i in range(num_iteration):
+        batch_input_texts=input_texts[i*batch_size:(i+1)*batch_size]
+        gen_logits=llm_gen(model,batch_input_texts,tokenizer,max_length)
+        label_logits=parse_response(gen_logits,tokenizer,dataset.id2verb)
+        probs=F.softmax(label_logits,axis=-1)
+        batch_label=labels[i*batch_size:(i+1)*batch_size]
+        batch_label=paddle.to_tensor(batch_label)
+        #get label porbs
+        index_ids=paddle.to_tensor([[i] for i in range(label_probs.shape[0])])
+        index=paddle.concat((index_ids,batch_label),axis=1)
+        label_probs=paddle.gather_nd(probs,index=index)
+        all_probs.append(label_probs)
+    all_probs=paddle.concat(all_probs,axis=0)
+
+    return all_probs
+
+def calcu_sparse_reward(all_probs,sample_num):
+    all_probs=all_probs.reshape((-1,sample_num))
+    u=paddle.mean(all_probs,axis=-1).unsqueeze(1)
+    sigma=paddle.std(all_probs,axis=-1).unsqueeze(1)
+    rewards=(all_probs-u)/sigma
+    return rewards 
 
 def test_by_LLM(model,
                 train_dataset=None,
