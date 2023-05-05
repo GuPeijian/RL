@@ -242,7 +242,7 @@ def main():
             max_prob_file.write(json.dumps(max_probs)+"\n")
             #evaluate
             with paddle.no_grad():
-                rewards=eval_by_LLM(llm,train_dataset,tokenizer,input_ids.squeeze(1),sampled_ids,args.eval_batch_size,args.max_length)
+                rewards=eval_by_LLM_dense(llm,train_dataset,tokenizer,input_ids.squeeze(1),sampled_ids,args.eval_batch_size,args.max_length)
 
             #calucu variance reduced rewards
             advantages=calcu_advantage(rewards,args.sample_num)

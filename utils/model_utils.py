@@ -150,7 +150,7 @@ def sample_sql(model,
     top_index=paddle.to_tensor([ i//topk_ids.shape[1] for i in range(topk_ids.shape[0] * topk_ids.shape[1])]).unsqueeze(1)
     top_index=paddle.concat((top_index,topk_ids.reshape((-1,1))),axis=1)
 
-    mask=paddle.zeros_like(topk_ids)
+    mask=paddle.zeros_like(topk_ids,dtype="int32")
     
     for round in range(length):
         logits=model(input_ids=_input_ids,return_dict=True).logits[:,-1,:]
@@ -231,8 +231,6 @@ def get_logits(model,
     output_logits=paddle.concat(output_logits,axis=1) # N * shot * k
     
     return output_logits
-
-
 
 def llm_gen(model, prompt, tokenizer, max_context_len):
     inputs = tokenizer.batch_encode(prompt,truncation=True,padding=True,return_tensors='pd',return_attention_mask=True,return_token_type_ids=False)
