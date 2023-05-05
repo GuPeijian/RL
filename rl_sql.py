@@ -234,8 +234,8 @@ def main():
     writer = LogWriter(os.getenv("VDL_LOG_PATH"))
     completed_steps = 0
     time_log = time.time()
-    total_p=0.0
-    last_p=0.0
+    total_loss=0.0
+    last_loss=0.0
 
     for epoch in range(args.num_train_epochs):
         for step,batch in enumerate(train_dataloader):
@@ -290,7 +290,7 @@ def main():
                             f" loss: {(total_loss-last_loss)/10},"
                             f" efficiency: {10 / (time.time() - time_log):.2f}steps/s")
                 time_log = time.time()
-                last_loss=total_p
+                last_loss=total_loss
     id_file.close()
     prob_file.close()
     reward_file.close()
