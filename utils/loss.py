@@ -88,7 +88,7 @@ def soft_q_loss_with_sparse_rewards_3(
     A2 =A.flip(axis=-1).cumsum(axis=-1).flip(axis=-1)
 
     raw_losses = F.mse_loss(
-        A2, rewards.view(-1, 1) - V_)
+        A2, rewards.reshape((-1, 1)) - V_)
 
     quantities_to_log = {
         "Q": Q,
@@ -120,7 +120,7 @@ def soft_q_loss_with_sparse_rewards(
     loss=(raw_loss_2+raw_loss_3)/2
 
     log={}
-    log["loss"]=loss.cpu().to_list()
+    log["loss"]=loss.cpu().tolist()
     for key, value  in log_2.items():
         #log[f"2_{key}"]=value
         log[f"2_{key}_max"]=value.max(axis=1).cpu().tolist()

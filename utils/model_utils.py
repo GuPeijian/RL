@@ -432,9 +432,9 @@ def eval_by_LLM_sparse(model,
         label_logits=parse_response(gen_logits,tokenizer,dataset.id2verb)
         probs=F.softmax(label_logits,axis=-1)
         batch_label=labels[i*batch_size:(i+1)*batch_size]
-        batch_label=paddle.to_tensor(batch_label)
+        batch_label=paddle.to_tensor(batch_label).unsqueeze(1)
         #get label porbs
-        index_ids=paddle.to_tensor([[i] for i in range(label_probs.shape[0])])
+        index_ids=paddle.to_tensor([[i] for i in range(probs.shape[0])])
         index=paddle.concat((index_ids,batch_label),axis=1)
         label_probs=paddle.gather_nd(probs,index=index)
         all_probs.append(label_probs)
@@ -447,6 +447,7 @@ def calcu_sparse_reward(all_probs,sample_num):
     u=paddle.mean(all_probs,axis=-1).unsqueeze(1)
     sigma=paddle.std(all_probs,axis=-1).unsqueeze(1)
     rewards=(all_probs-u)/sigma
+    rewards=rewards.reshape((-1,))
     return rewards 
 
 def test_by_LLM(model,

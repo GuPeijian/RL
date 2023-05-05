@@ -84,7 +84,7 @@ def parse_args():
     parser.add_argument(
         "--reward_factor",
         type=int,
-        default=100,
+        default=10,
     )
     parser.add_argument(
         "--lr_scheduler_type",
@@ -222,12 +222,12 @@ def main():
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(f"  Total optimization steps = {max_train_steps}")
 
-    log_path=os.path.join(args.output_dir,"log/"+args.dataset_name+f"/{args.seed}")
+    log_path=os.path.join(".","log_train/"+args.dataset_name+f"/{args.seed}")
     if not os.path.exists(log_path):
         os.makedirs(log_path, exist_ok=True)
     #log file
     id_file=open(os.path.join(log_path,"id.jsonl"),'w')
-    prob_file=open(os.path.join(log_path,"prob.jsonl"),'w')
+    prob_file=open(os.path.join(log_path,"id.jsonl"),'w')
     reward_file=open(os.path.join(log_path,"reward.jsonl"),'w')
     sql_log_file=open(os.path.join(log_path,"sql_log.jsonl"),'w')
 
@@ -246,7 +246,7 @@ def main():
             topk_ids=train_dataset.get_bm25_topk(input_ids.squeeze(1).cpu().tolist(),k=100)
             #sample
             logits,actions,action_list,action_probs_list=sample_sql(rl_model,input_ids,topk_ids,8,temperature=args.temperature)
-            #log ids and probs
+            #log ids
             id_file.write(json.dumps(action_list)+"\n")
             prob_file.write(json.dumps(action_probs_list)+"\n")
 
