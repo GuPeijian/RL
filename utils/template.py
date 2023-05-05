@@ -29,6 +29,13 @@ def make_prompt(dataset, ids, mode='train'):
     if mode == 'inference':
         return template_func(dataset.sampled_data[0], None, mode)
     
+    #mixin mode
+    if mode == 'mixin':
+        prompt_list=[]
+        for ins in dataset.sampled_data:
+            prompt_list.append(template_func(ins, dataset.label2verb[ins['label']], 'train'))
+        return prompt_list
+    
     #with label
     prompt = ''
     for ins in dataset.sampled_data:

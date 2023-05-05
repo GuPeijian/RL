@@ -320,6 +320,106 @@ def test_by_LLM(model,
 
     return prediction
 
+def mixin_test_by_LLM(model,
+                train_dataset=None,
+                dev_dataset=None,
+                tokenizer=None,
+                query_ids=None,
+                example_ids=None,
+                batch_size=None,
+                max_length=None,
+                alpha=1):
+    """
+    eval the selected_ids
+    input:
+        model: LLM for ICL
+        tokenizer: tokenize of LLM
+        train_dataset: train dataset
+        dev_dataset: dev dataset
+        query_ids: current ids
+        example_ids: selected ids
+        batch_size: eval batch_size
+        max_length: max_length for context
+    output:
+        prediction: prediction for test example
+    """
+    #make prompts
+    input_texts=[]
+    query_list=[]
+    num_query=len(query_ids)
+    shot=len(example_ids[0])
+    prompts_list=[[] for _ in range(shot)]
+    for i,query_id in enumerate(query_ids):
+        query=make_prompt(dev_dataset,[query_id],"inference")
+        prompts=make_prompt(train_dataset,example_ids[i],"mixin")
+        #seperate
+        query_list.append(query)
+        for n,prompt in enumerate(prompts):
+            prompts_list[n].append(prompt)
+           
+    #combine i and i+8
+    combined_prompts_list=[]
+    for i in range(shot//2):
+        combined_prompts_list.append(prompts_list[i]+prompts_list[i+shot//2])
+
+    #seperate encode
+    tokenized_query=tokenizer.batch_encode(query_list,return_tensors='pd',return_attention_mask=True,return_token_type_ids=False,padding=True)
+    tokenized_prompt=[]
+    for prompts in combined_prompts_list:
+        tokenized_prompt.append(tokenizer.batch_encode(prompts,return_tensors='pd',return_attention_mask=True,return_token_type_ids=False,padding=True))
+    
+    input_ids_0=[]
+    attention_mask_0=[]
+    
+    for item in tokenized_prompt:
+        input_ids_0.append(item["input_ids"])
+        attention_mask_0.append(item["attention_mask"])
+    input_ids_0=paddle.concat(input_ids_0,axis=1)
+    attention_mask_0=paddle.concat(attention_mask_0,axis=1)
+
+    # two stream
+    input_ids_1=input_ids_0[:num_query,:]
+    input_ids_2=input_ids_0[num_query:,:]
+    attention_mask_1=attention_mask_0[:num_query,:]
+    attention_mask_2=attention_mask_0[num_query:,:]
+
+    input_ids_1=paddle.concat((input_ids_1,tokenized_query["input_ids"]),axis=1)
+    attention_mask_1=paddle.concat((attention_mask_1,tokenized_query["attention_mask"]),axis=1)
+
+    input_ids_2=paddle.concat((input_ids_2,tokenized_query["input_ids"]),axis=1)
+    attention_mask_2=paddle.concat((attention_mask_2,tokenized_query["attention_mask"]),axis=1)
+
+    if input_ids_1.shape[1] > max_length:
+        input_ids_1 = input_ids_1[:, -max_length:]
+        attention_mask_1 = attention_mask_1[:, -max_length:]
+
+    if input_ids_2.shape[1] > max_length:
+        input_ids_2 = input_ids_2[:, -max_length:]
+        attention_mask_2 = attention_mask_2[:, -max_length:]
+
+    #get input embedding
+    inputs_embeds_1=model.embeddings.word_embeddings(input_ids_1)
+    inputs_embeds_2=model.embeddings.word_embeddings(input_ids_2)
+    inputs_embeds=alpha * inputs_embeds_1 + (1 - alpha) * inputs_embeds_2
+
+    #get attention mask
+    attention_mask_index=attention_mask_1+attention_mask_2
+    attention_mask=paddle.ones(attention_mask_index.shape,dtype=attention_mask_index.dtype)
+    attention_mask[attention_mask_index==0]=0
+
+    #generate
+    with paddle.no_grad():
+        logits = model.forward(inputs_embeds=inputs_embeds,
+                               attention_mask=attention_mask,
+                               return_dict=True).logits.detach()
+
+    gen_logits = logits[:, -1, :]
+    label_logits=parse_response(gen_logits,tokenizer,dev_dataset.id2verb)
+
+    prediction=paddle.argmax(label_logits,axis=1).cpu().tolist()
+
+    return prediction
+
 def make_mask(topk_ids,num_class):
     batch_size=len(topk_ids)
     k=len(topk_ids[0])
