@@ -173,7 +173,7 @@ def main():
         return paddle.concat(index_list)
 
     train_dataloader=DataLoader(index_dataset,batch_size=args.train_batch_size,shuffle=True,collate_fn=combine)
-
+    
     #eval
     llm.eval()
     rl_model.train()
@@ -251,6 +251,7 @@ def main():
             reward_file.write(json.dumps(vr_rewards.cpu().tolist())+"\n")
             #calcu gradient and normalize
             log_p=paddle.sum(paddle.log(sampled_probs),axis=1).unsqueeze(1)
+                        
             r_log_p=log_p*vr_rewards.reshape((-1,1))
             normalized_r_log_p=paddle.mean(r_log_p.squeeze(1))*args.sample_num/(args.sample_num-1)
             # optimize
@@ -262,6 +263,7 @@ def main():
             
             #log p
             p_to_log=float(paddle.mean(paddle.exp(paddle.mean(log_p.detach(),axis=1))).cpu().numpy())
+            print(p_to_log)
             writer.add_scalar('p', p_to_log, completed_steps)
             writer.add_scalar('lr', lr_scheduler.get_lr(), completed_steps)
             total_p+=p_to_log
